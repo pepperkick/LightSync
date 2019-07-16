@@ -19,6 +19,7 @@
 #include "state.h"
 
 #define VERSION "1.0.0"
+#define LOG_TAG "LSYNC"
 
 using namespace std;
 
@@ -47,7 +48,7 @@ MAKE_HOOK(SetActiveScene, 0x98D314, int, Scene scene) {
 
     csstrtostr(string, &eventText[0]);
 	
-    log("[GSI] Scene Loaded: %s!", eventText);
+    log("[%s] Scene Loaded: %s!", LOG_TAG, eventText);
 
 	return r;
 }
@@ -55,7 +56,7 @@ MAKE_HOOK(SetActiveScene, 0x98D314, int, Scene scene) {
 MAKE_HOOK(PauseGame, 0x1015614, void, void* self) {
 	PauseGame(self);
 	
-    log("[GSI] Paused Game!");
+    log("[%s] Paused Game!", LOG_TAG);
 
     curState.isPaused = true;
     
@@ -66,7 +67,7 @@ MAKE_HOOK(PauseGame, 0x1015614, void, void* self) {
 MAKE_HOOK(ResumeGame, 0x1015710, void, void* self) {
 	ResumeGame(self);
 	
-    log("[GSI] Resumed Game!");
+    log("[%s] Resumed Game!", LOG_TAG);
 
     curState.isPaused = false;
     
@@ -99,7 +100,7 @@ MAKE_HOOK(SendBeatmapEventDidTriggerEvent, 0xFA1F94, void, void* self, void* eve
 }
 
 static void on_socket_connected(rws_socket socket) {
-    log("[GSI] Socket connected");
+    log("[%s] Socket connected", LOG_TAG);
     rws_socket_send_text(socket, "{\"event\":\"hello\"}");
     _serverSocket = socket;
 }
@@ -108,9 +109,9 @@ static void on_socket_disconnected(rws_socket socket) {
     rws_error error = rws_socket_get_error(socket);
 
     if (error) { 
-        log("[GSI] Socket disconnected with code, error: %i, %s", rws_error_get_code(error), rws_error_get_description(error)); 
+        log("[%s] Socket disconnected with code, error: %i, %s", LOG_TAG, rws_error_get_code(error), rws_error_get_description(error)); 
     } else {
-        log("[GSI] Socket disconnected");
+        log("[%s] Socket disconnected", LOG_TAG);
     }
 
     _socket = NULL;
@@ -118,7 +119,7 @@ static void on_socket_disconnected(rws_socket socket) {
 }
 
 static void on_socket_received_text(rws_socket socket, const char * text, const unsigned int length) {
-    log("[GSI] Socket Received Text: %s", text);
+    log("[%s] Socket Received Text: %s", LOG_TAG, text);
 }
 
 __attribute__((constructor)) void lib_main() {
@@ -130,13 +131,17 @@ __attribute__((constructor)) void lib_main() {
     INSTALL_HOOK(BeatmapEventDataGetType);
     INSTALL_HOOK(SendBeatmapEventDidTriggerEvent);
 
+#ifdef USE_WEBSOCKET
     thread websocketThread(StartWebsocket);
-    thread phillipshueThread(StartPhilipsHue);
-
     websocketThread.detach();
-    phillipshueThread.detach();
+#endif
 
-    log("[GSI] Loaded, Version: %s", VERSION);
+#ifdef USE_PHILLIPSHUE
+    thread phillipshueThread(StartPhilipsHue);
+    phillipshueThread.detach();
+#endif
+
+    log("[%s] Loaded, Version: %s", LOG_TAG, VERSION);
 }
 
 void StartWebsocket() {
@@ -150,29 +155,27 @@ void StartWebsocket() {
     rws_socket_set_on_received_text(_socket, &on_socket_received_text);
     rws_socket_connect(_socket);
 
-    log("[GSI] Websocket Started");
+    log("[%s] Websocket Started", LOG_TAG);
 }
 
 void StartPhilipsHue() {
-    log("[GSI] HUE Starting...");
-
+    log("[%s] Searching for HUE Bridges", LOG_TAG);
     auto handler = std::make_shared<LinHttpHandler>();
     HueFinder finder(handler);
     vector<HueFinder::HueIdentification> bridges = finder.FindBridges();
-    log("[GSI] Searched Bridges...");
 
     if (bridges.empty()) {
-        log("[GSI] No HUE bridges found");
+        log("[%s] No HUE bridges found", LOG_TAG);
 
         return;
     }
 
     Hue bridge = finder.GetBridge(bridges[0]);
 
-    log("[GSI] Connected to HUE bridge %s", bridge.getBridgeIP().c_str());
+    log("[%s] Connected to HUE bridge %s", LOG_TAG, bridge.getBridgeIP().c_str());
 
     lights = bridge.getAllLights();
-    log("[GSI] Found %d HUE lights", lights.size());
+    log("[%s] Found %d HUE lights", LOG_TAG, lights.size());
     
     HueLight light = lights.at(0);
     light.setBrightness(255, 0);
@@ -196,7 +199,6 @@ void CheckData() {
         if (curState.isPaused && !oldState.isPaused) {
             lastColor = light.getColorXY();  
             light.setBrightness(0, 10);
-            log("[GSI] Pause Color");
         } else if (!curState.isPaused && oldState.isPaused) {
             light.setBrightness(255, 0);
             light.setColorXY(lastColor.first, lastColor.second, 2);            

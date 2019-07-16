@@ -76,7 +76,7 @@ include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_LDLIBS := -llog
-LOCAL_MODULE    := gsi
+LOCAL_MODULE    := lightsync
 LOCAL_CFLAGS += -fexceptions
 LOCAL_SRC_FILES := src/main.cpp include/utils/utils.cpp include/inline-hook/inlineHook.c include/inline-hook/relocate.c
 LOCAL_STATIC_LIBRARIES := librws libhue
