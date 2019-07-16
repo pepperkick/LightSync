@@ -25,7 +25,7 @@ LOCAL_MODULE := hook
 #LOCAL_EXPORT_C_INCLUDES := $(LOCAL_PATH)/../include
 
 include $(CLEAR_VARS)
-ALL_SOURCES := \
+RWS_SOURCES := \
 	include/librws/rws_common.c \
 	include/librws/rws_error.c \
 	include/librws/rws_frame.c \
@@ -37,29 +37,47 @@ ALL_SOURCES := \
 	include/librws/rws_string.c \
 	include/librws/rws_thread.c
 
+RWS_INCLUDES := $(LOCAL_PATH)/include
 
-ALL_INCLUDES := $(LOCAL_PATH)/include
-
-ALL_CFLAGS := -w
-
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES := libs/libnode.so
-LOCAL_MODULE := libnode
-LOCAL_LDLIBS += -llog
-include $(PREBUILT_SHARED_LIBRARY)
+RWS_CFLAGS := -w
 
 include $(CLEAR_VARS)
-LOCAL_SRC_FILES := $(ALL_SOURCES)
-LOCAL_C_INCLUDES += $(ALL_INCLUDES)
-LOCAL_CFLAGS += $(ALL_CFLAGS)
+LOCAL_SRC_FILES := $(RWS_SOURCES)
+LOCAL_C_INCLUDES += $(RWS_INCLUDES)
+LOCAL_CFLAGS += $(RWS_CFLAGS)
 LOCAL_MODULE := librws
+LOCAL_LDLIBS += -llog
+include $(BUILD_SHARED_LIBRARY)
+
+HUE_SOURCES := \
+	include/hueplusplus/ExtendedColorHueStrategy.cpp \
+	include/hueplusplus/ExtendedColorTemperatureStrategy.cpp \
+	include/hueplusplus/Hue.cpp \
+	include/hueplusplus/HueCommandAPI.cpp \
+	include/hueplusplus/HueLight.cpp \
+	include/hueplusplus/jsoncpp.cpp \
+	include/hueplusplus/SimpleBrightnessStrategy.cpp \
+	include/hueplusplus/SimpleColorHueStrategy.cpp \
+	include/hueplusplus/SimpleColorTemperatureStrategy.cpp \
+	include/hueplusplus/UPnP.cpp \
+	include/hueplusplus/LinHttpHandler.cpp
+
+HUE_INCLUDES := $(LOCAL_PATH)/include
+
+HUE_CFLAGS := -w -fexceptions
+
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := $(HUE_SOURCES)
+LOCAL_C_INCLUDES += $(HUE_INCLUDES)
+LOCAL_CFLAGS += $(HUE_CFLAGS)
+LOCAL_MODULE := libhue
 LOCAL_LDLIBS += -llog
 include $(BUILD_SHARED_LIBRARY)
 
 include $(CLEAR_VARS)
 LOCAL_LDLIBS := -llog
 LOCAL_MODULE    := gsi
-LOCAL_CFLAGS += $(ALL_CFLAGS)
-LOCAL_SRC_FILES := main.cpp include/utils/utils.cpp include/inline-hook/inlineHook.c include/inline-hook/relocate.c
-LOCAL_STATIC_LIBRARIES := librws
+LOCAL_CFLAGS += -fexceptions
+LOCAL_SRC_FILES := src/main.cpp include/utils/utils.cpp include/inline-hook/inlineHook.c include/inline-hook/relocate.c
+LOCAL_STATIC_LIBRARIES := librws libhue
 include $(BUILD_SHARED_LIBRARY)
