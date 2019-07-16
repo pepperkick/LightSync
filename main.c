@@ -19,13 +19,11 @@ MAKE_HOOK(GetNameInternal, 0x98CC0C, cs_string*, int handle) {
 	return GetNameInternal(handle);
 }
 
-MAKE_HOOK(SetActiveScene, 0x98D314, int, int handle) {	
-    log("[GSI] Set Active Called");
-
-    int r = SetActiveScene(handle);
+MAKE_HOOK(SetActiveScene, 0x98D314, int, Scene scene) {	
+    int r = SetActiveScene(scene);
 	char* str[128];
 	
-	csstrtostr(GetNameInternal(handle), str);
+	csstrtostr(GetNameInternal(scene.m_Handle), str);
 	
     log("[GSI] Scene Loaded: %s!", str);
 	
@@ -44,11 +42,28 @@ MAKE_HOOK(ResumeGame, 0x1015710, void, void* self) {
     log("[GSI] Resumed Game!");
 }
 
+MAKE_HOOK(BeatmapEventDataGetType, 0xF9A1D0, int, void* self) {
+    return BeatmapEventDataGetType(self);
+}
+
+MAKE_HOOK(BeatmapEventDataGetValue, 0xF9A1F0, int, void* self) {
+    return BeatmapEventDataGetValue(self);
+}
+
+MAKE_HOOK(SendBeatmapEventDidTriggerEvent, 0xFA1F94, void, void* self, void* event) {
+    SendBeatmapEventDidTriggerEvent(self, event);
+    
+    log("[GSI] BeatmapEvent Data: %d %d!", (unsigned int) BeatmapEventDataGetValue(event), (unsigned int) BeatmapEventDataGetType(event));
+}
+
 __attribute__((constructor)) void lib_main() {
     INSTALL_HOOK(GetNameInternal);
     INSTALL_HOOK(SetActiveScene);
     INSTALL_HOOK(PauseGame);
     INSTALL_HOOK(ResumeGame);
+    INSTALL_HOOK(BeatmapEventDataGetValue);
+    INSTALL_HOOK(BeatmapEventDataGetType);
+    INSTALL_HOOK(SendBeatmapEventDidTriggerEvent);
 	
     log("[GSI] Loaded, Version: %s", VERSION);
 }
