@@ -5,13 +5,16 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
+#include <string>
 
-#include "include/inline-hook/inlineHook.h"
 #include "include/utils/utils.h"
+#include "include/inline-hook/inlineHook.h"
 #include "include/librws.h"
 #include "include/config.h"
 
 #define VERSION "1.0.0"
+
+using namespace std;
 
 rws_socket _socket = NULL;
 rws_socket _serverSocket = NULL;
@@ -26,11 +29,12 @@ MAKE_HOOK(GetNameInternal, 0x98CC0C, cs_string*, int handle) {
 
 MAKE_HOOK(SetActiveScene, 0x98D314, int, Scene scene) {	
     int r = SetActiveScene(scene);
-	char* str[128];
+    cs_string* string = GetNameInternal(scene.m_Handle);
+    char eventText[128];
+
+    csstrtostr(string, &eventText[0]);
 	
-	csstrtostr(GetNameInternal(scene.m_Handle), str);
-	
-    log("[GSI] Scene Loaded: %s!", str);
+    log("[GSI] Scene Loaded: %s!", eventText);
 	
 	return r;
 }
@@ -67,8 +71,8 @@ MAKE_HOOK(SendBeatmapEventDidTriggerEvent, 0xFA1F94, void, void* self, void* eve
     int type = (unsigned int) BeatmapEventDataGetType(event);
     int value = (unsigned int) BeatmapEventDataGetValue(event);
 
-    const char* eventText[128];
-    sprintf(eventText, "{ \"event\": \"beatmapEvent\", \"beatmapEvent\": { \"type\": %d, \"value\": %d } }", type, value);
+    char eventText[128];
+    sprintf(&eventText[0], "{ \"event\": \"beatmapEvent\", \"beatmapEvent\": { \"type\": %d, \"value\": %d } }", type, value);
 
     if (_serverSocket)
         rws_socket_send_text(_serverSocket, eventText);
@@ -106,8 +110,6 @@ __attribute__((constructor)) void lib_main() {
     INSTALL_HOOK(BeatmapEventDataGetType);
     INSTALL_HOOK(SendBeatmapEventDidTriggerEvent);
 
-    log("[GSI] Starting");
-	
     _socket = rws_socket_create();
     rws_socket_set_scheme(_socket, "ws");
     rws_socket_set_host(_socket, SOCKET_IP);
@@ -117,6 +119,6 @@ __attribute__((constructor)) void lib_main() {
     rws_socket_set_on_connected(_socket, &on_socket_connected);
     rws_socket_set_on_received_text(_socket, &on_socket_received_text);
     rws_socket_connect(_socket);
-
+    
     log("[GSI] Loaded, Version: %s", VERSION);
 }

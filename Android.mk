@@ -43,6 +43,12 @@ ALL_INCLUDES := $(LOCAL_PATH)/include
 ALL_CFLAGS := -w
 
 include $(CLEAR_VARS)
+LOCAL_SRC_FILES := libs/libnode.so
+LOCAL_MODULE := libnode
+LOCAL_LDLIBS += -llog
+include $(PREBUILT_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
 LOCAL_SRC_FILES := $(ALL_SOURCES)
 LOCAL_C_INCLUDES += $(ALL_INCLUDES)
 LOCAL_CFLAGS += $(ALL_CFLAGS)
@@ -53,6 +59,7 @@ include $(BUILD_SHARED_LIBRARY)
 include $(CLEAR_VARS)
 LOCAL_LDLIBS := -llog
 LOCAL_MODULE    := gsi
-LOCAL_SRC_FILES := main.c include/utils/utils.c include/inline-hook/inlineHook.c include/inline-hook/relocate.c
+LOCAL_CFLAGS += $(ALL_CFLAGS)
+LOCAL_SRC_FILES := main.cpp include/utils/utils.cpp include/inline-hook/inlineHook.c include/inline-hook/relocate.c
 LOCAL_STATIC_LIBRARIES := librws
 include $(BUILD_SHARED_LIBRARY)
