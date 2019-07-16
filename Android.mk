@@ -27,6 +27,6 @@ LOCAL_MODULE := hook
 include $(CLEAR_VARS)
 LOCAL_LDLIBS := -llog
 LOCAL_MODULE    := gsi
-LOCAL_SRC_FILES := main.c ../shared/utils/utils.c ../shared/inline-hook/inlineHook.c ../shared/inline-hook/relocate.c
+LOCAL_SRC_FILES := main.c include/utils/utils.c include/inline-hook/inlineHook.c include/inline-hook/relocate.c
 #LOCAL_STATIC_LIBRARIES := libhook
 include $(BUILD_SHARED_LIBRARY)
