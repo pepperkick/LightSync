@@ -9,7 +9,8 @@ Upload the `lightsync.zip` from release to BeatOn
 ## Running
 
 Before you start BeatSaber along with the mod, press the link button in your HUE bridge to connect.
-All connected lights should animate red to blue when connection is established.
+
+All connected lights should animate red to blue when the connection is established.
 
 ## Building
 
