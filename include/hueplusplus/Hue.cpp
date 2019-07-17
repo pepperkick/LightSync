@@ -71,7 +71,6 @@ std::vector<HueFinder::HueIdentification> HueFinder::FindBridges() const
     return foundBridges;
 }
 
-
 Hue HueFinder::GetBridge(const HueIdentification& identification)
 {
     auto pos = usernames.find(identification.mac);
@@ -83,8 +82,7 @@ Hue HueFinder::GetBridge(const HueIdentification& identification)
     bridge.requestUsername(identification.ip);
     if (bridge.getUsername().empty())
     {
-        std::cerr << "Failed to request username for ip " << identification.ip << std::endl;
-        throw std::runtime_error("Failed to request username!");
+        return bridge;
     }
     AddUsername(identification.mac, bridge.getUsername());
 
