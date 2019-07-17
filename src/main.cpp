@@ -16,12 +16,13 @@
 
 #include "state.h"
 
-#define VERSION "1.0.0"
+#define VERSION "1.0.1"
 #define LOG_TAG "LSYNC"
 
 using namespace std;
 
 void StartPhilipsHue();
+void PlayWelcomeSequence();
 void CheckData();
 
 std::vector<std::reference_wrapper<HueLight>> lights;
@@ -38,14 +39,15 @@ MAKE_HOOK(GetNameInternal, 0xBE31C4, cs_string*, int handle) {
 
 MAKE_HOOK(SetActiveScene, 0xBE38CC, int, Scene scene) {	
     int r = SetActiveScene(scene);
+
     cs_string* string = GetNameInternal(scene.m_Handle);
     char eventText[128];
 
     csstrtostr(string, &eventText[0]);
-	
+    
     log("[%s] Scene Loaded: %s!", LOG_TAG, eventText);
 
-	return r;
+    return r;
 }
 
 MAKE_HOOK(PauseGame, 0x1327EAC, void, void* self) {
@@ -99,6 +101,7 @@ __attribute__((constructor)) void lib_main() {
 
 void StartPhilipsHue() {
     log("[%s] Searching for HUE Bridges", LOG_TAG);
+
     auto handler = std::make_shared<LinHttpHandler>();
     HueFinder finder(handler);
     vector<HueFinder::HueIdentification> bridges = finder.FindBridges();
@@ -110,23 +113,18 @@ void StartPhilipsHue() {
     }
 
     Hue bridge = finder.GetBridge(bridges[0]);
+    if (bridge.getUsername().empty()) {
+        log("[%s] Could not authenticate with HUE bridge", LOG_TAG);
+
+        return;
+    }
 
     log("[%s] Connected to HUE bridge %s", LOG_TAG, bridge.getBridgeIP().c_str());
 
     lights = bridge.getAllLights();
     log("[%s] Found %d HUE lights", LOG_TAG, lights.size());
     
-    HueLight light = lights.at(0);
-    pair<float, float> lastColor(0.0f, 0.0f);
-    lastColor = light.getColorXY();  
-
-    light.setBrightness(255, 0);
-    light.setColorRGB(240, 48, 48, 5);
-    this_thread::sleep_for(chrono::milliseconds(750));
-    light.setColorRGB(48, 158, 255, 5);
-    this_thread::sleep_for(chrono::milliseconds(750));
-    light.setColorXY(lastColor.first, lastColor.second, 5);      
-    this_thread::sleep_for(chrono::milliseconds(750));
+    PlayWelcomeSequence();
 
     while (true) {
         CheckData();
@@ -135,7 +133,7 @@ void StartPhilipsHue() {
 }
 
 pair<float, float> lastColor(0.0f, 0.0f);
-void CheckData() {       
+void CheckData() {
     for (int i = 0; i < lights.size(); i++) {      
         HueLight light = lights.at(i);  
 
@@ -176,4 +174,18 @@ void CheckData() {
     }
 
     oldState = curState;
+}
+
+void PlayWelcomeSequence() {
+    HueLight light = lights.at(0);
+    pair<float, float> lastColor(0.0f, 0.0f);
+    lastColor = light.getColorXY();  
+
+    light.setBrightness(255, 0);
+    light.setColorRGB(240, 48, 48, 5);
+    this_thread::sleep_for(chrono::milliseconds(750));
+    light.setColorRGB(48, 158, 255, 5);
+    this_thread::sleep_for(chrono::milliseconds(750));
+    light.setColorXY(lastColor.first, lastColor.second, 5);      
+    this_thread::sleep_for(chrono::milliseconds(750));
 }
