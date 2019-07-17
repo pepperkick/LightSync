@@ -16,7 +16,7 @@
 
 #include "state.h"
 
-#define VERSION "1.0.1"
+#define VERSION "1.0.0"
 #define LOG_TAG "LSYNC"
 
 using namespace std;
