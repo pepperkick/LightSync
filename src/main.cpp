@@ -27,7 +27,8 @@ void CheckData();
 
 std::vector<std::reference_wrapper<HueLight>> lights;
 
-GameState curState, oldState;
+GameState curState;
+GameStateUpdate stateUpdate;
 
 typedef struct __attribute__((__packed__)) {
     int m_Handle;
@@ -55,7 +56,7 @@ MAKE_HOOK(PauseGame, 0x1327EAC, void, void* self) {
 	
     log("[%s] Paused Game!", LOG_TAG);
 
-    curState.isPaused = true;
+    stateUpdate.type = UpdateType::GAME_PAUSE;
 }
 
 MAKE_HOOK(ResumeGame, 0x1327FA8, void, void* self) {
@@ -63,7 +64,7 @@ MAKE_HOOK(ResumeGame, 0x1327FA8, void, void* self) {
 	
     log("[%s] Resumed Game!", LOG_TAG);
 
-    curState.isPaused = false;
+    stateUpdate.type = UpdateType::GAME_UNPAUSE;
 }
 
 MAKE_HOOK(BeatmapEventDataGetType, 0x12A966C, int, void* self) {
@@ -81,7 +82,8 @@ MAKE_HOOK(SendBeatmapEventDidTriggerEvent, 0x12B5130, void, void* self, void* ev
     int value = (unsigned int) BeatmapEventDataGetValue(event);
 
     Event* beatEvent = new Event(type, value);
-    curState.beatmapEvent = *beatEvent;
+    stateUpdate.beatmapEvent = *beatEvent;
+    stateUpdate.type = UpdateType::BEATMAP_EVENT;
 }
 
 __attribute__((constructor)) void lib_main() {
@@ -134,17 +136,29 @@ void StartPhilipsHue() {
 
 pair<float, float> lastColor(0.0f, 0.0f);
 void CheckData() {
+    if (stateUpdate.type == UpdateType::UNKNOWN) return;
+
     for (int i = 0; i < lights.size(); i++) {      
         HueLight light = lights.at(i);  
 
-        if (curState.isPaused && !oldState.isPaused) {
+        if (stateUpdate.type == UpdateType::GAME_PAUSE) {
             lastColor = light.getColorXY();  
             light.setBrightness(0, 10);
-        } else if (!curState.isPaused && oldState.isPaused) {
+
+            curState.isPaused = true;
+        } else if (stateUpdate.type == UpdateType::GAME_UNPAUSE) {
             light.setBrightness(255, 0);
             light.setColorXY(lastColor.first, lastColor.second, 2);            
-        } else if (curState.beatmapEvent.type < 5) {     
-            int value = curState.beatmapEvent.value;     
+
+            curState.isPaused = false;
+        } else if (stateUpdate.type == UpdateType::BEATMAP_EVENT) {
+            curState.isPaused = false;     
+
+            int type = stateUpdate.beatmapEvent.type;
+            int value = stateUpdate.beatmapEvent.value;     
+
+            if (type > 4) continue;
+
             switch (value) {
                 case 0:
                     light.setBrightness(0, 1);
@@ -173,7 +187,7 @@ void CheckData() {
         }
     }
 
-    oldState = curState;
+    stateUpdate.type = UpdateType::UNKNOWN;
 }
 
 void PlayWelcomeSequence() {
