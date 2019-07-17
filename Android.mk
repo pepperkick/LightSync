@@ -18,7 +18,11 @@ LOCAL_PATH := $(call my-dir)
 
 TARGET_ARCH_ABI := armeabi-v7a
 
-HUE_SOURCES := \
+ALL_SOURCES := \
+	src/main.cpp \
+	include/utils/utils.cpp \
+	include/inline-hook/inlineHook.c \
+	include/inline-hook/relocate.c \
 	include/hueplusplus/ExtendedColorHueStrategy.cpp \
 	include/hueplusplus/ExtendedColorTemperatureStrategy.cpp \
 	include/hueplusplus/Hue.cpp \
@@ -31,22 +35,14 @@ HUE_SOURCES := \
 	include/hueplusplus/UPnP.cpp \
 	include/hueplusplus/LinHttpHandler.cpp
 
-HUE_INCLUDES := $(LOCAL_PATH)/include
+ALL_INCLUDES := $(LOCAL_PATH)/include
 
-HUE_CFLAGS := -w -fexceptions
-
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES := $(HUE_SOURCES)
-LOCAL_C_INCLUDES += $(HUE_INCLUDES)
-LOCAL_CFLAGS += $(HUE_CFLAGS)
-LOCAL_MODULE := libhue
-LOCAL_LDLIBS += -llog
-include $(BUILD_SHARED_LIBRARY)
+ALL_CFLAGS := -w -fexceptions
 
 include $(CLEAR_VARS)
 LOCAL_LDLIBS := -llog
 LOCAL_MODULE    := lightsync
 LOCAL_CFLAGS += -fexceptions
-LOCAL_SRC_FILES := src/main.cpp include/utils/utils.cpp include/inline-hook/inlineHook.c include/inline-hook/relocate.c
-LOCAL_STATIC_LIBRARIES := libhue
+LOCAL_C_INCLUDES += $(HUE_INCLUDES)
+LOCAL_SRC_FILES := ${ALL_SOURCES}
 include $(BUILD_SHARED_LIBRARY)
