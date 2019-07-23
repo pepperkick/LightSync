@@ -11,7 +11,6 @@
 #include "include/utils/utils.h"
 #include "include/inline-hook/inlineHook.h"
 #include "include/hueplusplus/Hue.h"
-#include "include/hueplusplus/IHttpHandler.h"
 #include "include/hueplusplus/LinHttpHandler.h"
 
 #include "state.h"
@@ -34,12 +33,12 @@ typedef struct __attribute__((__packed__)) {
     int m_Handle;
 } Scene;
 
-MAKE_HOOK(GetNameInternal, 0xBE31C4, cs_string*, int handle) {
-	return GetNameInternal(handle);
+MAKE_HOOK(Hook_Scene_GetNameInternal, 0xBE31C4, cs_string*, int handle) {
+	return Hook_Scene_GetNameInternal(handle);
 }
 
-MAKE_HOOK(SetActiveScene, 0xBE38CC, int, Scene scene) {	
-    int r = SetActiveScene(scene);
+MAKE_HOOK(Hook_SceneManager_SetActiveScene, 0xBE38CC, int, Scene scene) {
+    int r = Hook_SceneManager_SetActiveScene(scene);
 
     cs_string* string = GetNameInternal(scene.m_Handle);
     char eventText[128];
@@ -51,32 +50,32 @@ MAKE_HOOK(SetActiveScene, 0xBE38CC, int, Scene scene) {
     return r;
 }
 
-MAKE_HOOK(PauseGame, 0x1327EAC, void, void* self) {
-	PauseGame(self);
+MAKE_HOOK(Hook_GamePauseManager_PauseGame, 0x1327EAC, void, void* self) {
+    Hook_GamePauseManager_PauseGame(self);
 	
     log("[%s] Paused Game!", LOG_TAG);
 
     stateUpdate.type = UpdateType::GAME_PAUSE;
 }
 
-MAKE_HOOK(ResumeGame, 0x1327FA8, void, void* self) {
-	ResumeGame(self);
+MAKE_HOOK(Hook_GamePauseManager_ResumeGame, 0x1327FA8, void, void* self) {
+    Hook_GamePauseManager_ResumeGame(self);
 	
     log("[%s] Resumed Game!", LOG_TAG);
 
     stateUpdate.type = UpdateType::GAME_UNPAUSE;
 }
 
-MAKE_HOOK(BeatmapEventDataGetType, 0x12A966C, int, void* self) {
-    return BeatmapEventDataGetType(self);
+MAKE_HOOK(Hook_BeatmapEventData_GetType, 0x12A966C, int, void* self) {
+    return Hook_BeatmapEventData_GetType(self);
 }
 
-MAKE_HOOK(BeatmapEventDataGetValue, 0x12AD20C, int, void* self) {
-    return BeatmapEventDataGetValue(self);
+MAKE_HOOK(Hook_BeatmapEventData_GetValue, 0x12AD20C, int, void* self) {
+    return Hook_BeatmapEventData_GetValue(self);
 }
 
-MAKE_HOOK(SendBeatmapEventDidTriggerEvent, 0x12B5130, void, void* self, void* event) {
-    SendBeatmapEventDidTriggerEvent(self, event);
+MAKE_HOOK(Hook_BeatmapObjectCallback_TriggerEvent, 0x12B5130, void, void* self, void* event) {
+    Hook_BeatmapObjectCallback_TriggerEvent(self, event);
     
     int type = (unsigned int) BeatmapEventDataGetType(event);
     int value = (unsigned int) BeatmapEventDataGetValue(event);
@@ -87,16 +86,16 @@ MAKE_HOOK(SendBeatmapEventDidTriggerEvent, 0x12B5130, void, void* self, void* ev
 }
 
 __attribute__((constructor)) void lib_main() {
-    INSTALL_HOOK(GetNameInternal);
-    INSTALL_HOOK(SetActiveScene);
-    INSTALL_HOOK(PauseGame);
-    INSTALL_HOOK(ResumeGame);
-    INSTALL_HOOK(BeatmapEventDataGetValue);
-    INSTALL_HOOK(BeatmapEventDataGetType);
-    INSTALL_HOOK(SendBeatmapEventDidTriggerEvent);
+    INSTALL_HOOK(Hook_Scene_GetNameInternal);
+    INSTALL_HOOK(Hook_SceneManager_SetActiveScene);
+    INSTALL_HOOK(Hook_GamePauseManager_PauseGame);
+    INSTALL_HOOK(Hook_GamePauseManager_ResumeGame);
+    INSTALL_HOOK(Hook_BeatmapEventData_GetValue);
+    INSTALL_HOOK(Hook_BeatmapEventData_GetType);
+    INSTALL_HOOK(Hook_BeatmapObjectCallback_TriggerEvent);
 
-    thread phillipshueThread(StartPhilipsHue);
-    phillipshueThread.detach();
+    thread phillipsHue_Thread(StartPhilipsHue);
+    phillipsHue_Thread.detach();
 
     log("[%s] Loaded, Version: %s", LOG_TAG, VERSION);
 }

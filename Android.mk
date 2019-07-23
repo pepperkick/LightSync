@@ -42,7 +42,7 @@ ALL_CFLAGS := -w -fexceptions
 include $(CLEAR_VARS)
 LOCAL_LDLIBS := -llog
 LOCAL_MODULE    := lightsync
-LOCAL_CFLAGS += -fexceptions
+LOCAL_CFLAGS += ${ALL_CFLAGS}
 LOCAL_C_INCLUDES += $(HUE_INCLUDES)
 LOCAL_SRC_FILES := ${ALL_SOURCES}
 include $(BUILD_SHARED_LIBRARY)
