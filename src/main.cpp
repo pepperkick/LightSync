@@ -24,14 +24,19 @@ void StartPhilipsHue();
 void PlayWelcomeSequence();
 void CheckData();
 
-std::vector<std::reference_wrapper<HueLight>> lights;
-
-GameState curState;
-GameStateUpdate stateUpdate;
+typedef struct __attribute__((__packed__)) {
+    float r, g, b, a;
+} Color;
 
 typedef struct __attribute__((__packed__)) {
     int m_Handle;
 } Scene;
+
+std::vector<std::reference_wrapper<HueLight>> g_Lights;
+
+GameState g_CurState;
+GameStateUpdate g_StateUpdate;
+Color g_ColorA, g_ColorB;
 
 MAKE_HOOK(Hook_Scene_GetNameInternal, 0xBE31C4, cs_string*, int handle) {
 	return Hook_Scene_GetNameInternal(handle);
@@ -40,7 +45,7 @@ MAKE_HOOK(Hook_Scene_GetNameInternal, 0xBE31C4, cs_string*, int handle) {
 MAKE_HOOK(Hook_SceneManager_SetActiveScene, 0xBE38CC, int, Scene scene) {
     int r = Hook_SceneManager_SetActiveScene(scene);
 
-    cs_string* string = GetNameInternal(scene.m_Handle);
+    cs_string* string = Hook_Scene_GetNameInternal(scene.m_Handle);
     char eventText[128];
 
     csstrtostr(string, &eventText[0]);
@@ -55,7 +60,7 @@ MAKE_HOOK(Hook_GamePauseManager_PauseGame, 0x1327EAC, void, void* self) {
 	
     log("[%s] Paused Game!", LOG_TAG);
 
-    stateUpdate.type = UpdateType::GAME_PAUSE;
+    g_StateUpdate.type = UpdateType::GAME_PAUSE;
 }
 
 MAKE_HOOK(Hook_GamePauseManager_ResumeGame, 0x1327FA8, void, void* self) {
@@ -63,7 +68,7 @@ MAKE_HOOK(Hook_GamePauseManager_ResumeGame, 0x1327FA8, void, void* self) {
 	
     log("[%s] Resumed Game!", LOG_TAG);
 
-    stateUpdate.type = UpdateType::GAME_UNPAUSE;
+    g_StateUpdate.type = UpdateType::GAME_UNPAUSE;
 }
 
 MAKE_HOOK(Hook_BeatmapEventData_GetType, 0x12A966C, int, void* self) {
@@ -77,12 +82,28 @@ MAKE_HOOK(Hook_BeatmapEventData_GetValue, 0x12AD20C, int, void* self) {
 MAKE_HOOK(Hook_BeatmapObjectCallback_TriggerEvent, 0x12B5130, void, void* self, void* event) {
     Hook_BeatmapObjectCallback_TriggerEvent(self, event);
     
-    int type = (unsigned int) BeatmapEventDataGetType(event);
-    int value = (unsigned int) BeatmapEventDataGetValue(event);
+    int type = (unsigned int) Hook_BeatmapEventData_GetType(event);
+    int value = (unsigned int) Hook_BeatmapEventData_GetValue(event);
 
     Event* beatEvent = new Event(type, value);
-    stateUpdate.beatmapEvent = *beatEvent;
-    stateUpdate.type = UpdateType::BEATMAP_EVENT;
+    g_StateUpdate.beatmapEvent = *beatEvent;
+    g_StateUpdate.type = UpdateType::BEATMAP_EVENT;
+}
+
+MAKE_HOOK(Hook_ColorManager_GetColorA, 0x130C350, Color, void* self) {
+    Color color = Hook_ColorManager_GetColorA(self);
+    
+    g_ColorA = color;
+    
+    return color;
+}
+
+MAKE_HOOK(Hook_ColorManager_GetColorB, 0x130C4A8, Color, void* self) {
+    Color color = Hook_ColorManager_GetColorB(self);
+    
+    g_ColorB = color;
+    
+    return color;
 }
 
 __attribute__((constructor)) void lib_main() {
@@ -93,6 +114,8 @@ __attribute__((constructor)) void lib_main() {
     INSTALL_HOOK(Hook_BeatmapEventData_GetValue);
     INSTALL_HOOK(Hook_BeatmapEventData_GetType);
     INSTALL_HOOK(Hook_BeatmapObjectCallback_TriggerEvent);
+    INSTALL_HOOK(Hook_ColorManager_GetColorA);
+    INSTALL_HOOK(Hook_ColorManager_GetColorB);
 
     thread phillipsHue_Thread(StartPhilipsHue);
     phillipsHue_Thread.detach();
@@ -122,79 +145,81 @@ void StartPhilipsHue() {
 
     log("[%s] Connected to HUE bridge %s", LOG_TAG, bridge.getBridgeIP().c_str());
 
-    lights = bridge.getAllLights();
-    log("[%s] Found %d HUE lights", LOG_TAG, lights.size());
+    g_Lights = bridge.getAllLights();
+    log("[%s] Found %d HUE lights", LOG_TAG, g_Lights.size());
     
     PlayWelcomeSequence();
 
     while (true) {
         CheckData();
-        this_thread::sleep_for(chrono::milliseconds(100));
+        this_thread::sleep_for(chrono::milliseconds(10));
     }
 }
 
 pair<float, float> lastColor(0.0f, 0.0f);
 void CheckData() {
-    if (stateUpdate.type == UpdateType::UNKNOWN) return;
+    if (g_StateUpdate.type == UpdateType::UNKNOWN) return;
 
-    for (int i = 0; i < lights.size(); i++) {      
-        HueLight light = lights.at(i);  
+    for (int i = 0; i < g_Lights.size(); i++) {
+        HueLight light = g_Lights.at(i);
 
-        if (stateUpdate.type == UpdateType::GAME_PAUSE) {
+        if (g_StateUpdate.type == UpdateType::GAME_PAUSE) {
             lastColor = light.getColorXY();  
             light.setBrightness(0, 10);
 
-            curState.isPaused = true;
-        } else if (stateUpdate.type == UpdateType::GAME_UNPAUSE) {
+            g_CurState.isPaused = true;
+        } else if (g_StateUpdate.type == UpdateType::GAME_UNPAUSE) {
             light.setBrightness(255, 0);
             light.setColorXY(lastColor.first, lastColor.second, 2);            
 
-            curState.isPaused = false;
-        } else if (stateUpdate.type == UpdateType::BEATMAP_EVENT) {
-            curState.isPaused = false;     
+            g_CurState.isPaused = false;
+        } else if (g_StateUpdate.type == UpdateType::BEATMAP_EVENT) {
+            g_CurState.isPaused = false;
 
-            int type = stateUpdate.beatmapEvent.type;
-            int value = stateUpdate.beatmapEvent.value;     
+            int type = g_StateUpdate.beatmapEvent.type;
+            int value = g_StateUpdate.beatmapEvent.value;
 
             if (type > 4) continue;
-
+            
             switch (value) {
                 case 0:
                     light.setBrightness(0, 1);
                     break;
                 case 1:
                 case 2:
-                    light.setColorRGB(48, 158, 255, 1);
-                    light.setBrightness(255, 2);
+                    light.setColorRGB( g_ColorB.r * 255, g_ColorB.g * 255, g_ColorB.b * 255, 1);
+                    light.setBrightness(254, 2);
                     break;
-                case 3: 
-                    light.setColorRGB(48, 158, 255, 1);
-                    light.setBrightness(125, 1);
+                case 3:
+                    light.setBrightness(254, 1);
+                    light.setColorRGB( g_ColorB.r * 255, g_ColorB.g * 255, g_ColorB.b * 255, 1);
+                    light.setBrightness(1, 100);
                     break;
                 case 4:
                     break;
                 case 5:
                 case 6:
-                    light.setColorRGB(240, 48, 48, 1);
-                    light.setBrightness(255, 1);
+                    light.setColorRGB(g_ColorA.r * 255, g_ColorA.g * 255, g_ColorA.b * 255, 1);
+                    light.setBrightness(254, 1);
                     break;
                 case 7:
-                    light.setColorRGB(240, 48, 48, 1);
-                    light.setBrightness(125, 1);
+                    light.setBrightness(254, 1);
+                    light.setColorRGB(g_ColorA.r * 255, g_ColorA.g * 255, g_ColorA.b * 255, 1);
+                    light.setBrightness(1, 100);
                     break;
             }
         }
     }
 
-    stateUpdate.type = UpdateType::UNKNOWN;
+    g_StateUpdate.type = UpdateType::UNKNOWN;
 }
 
 void PlayWelcomeSequence() {
-    HueLight light = lights.at(0);
+    HueLight light = g_Lights.at(0);
     pair<float, float> lastColor(0.0f, 0.0f);
     lastColor = light.getColorXY();  
 
-    light.setBrightness(255, 0);
+    light.setBrightness(254, 0);
     light.setColorRGB(240, 48, 48, 5);
     this_thread::sleep_for(chrono::milliseconds(750));
     light.setColorRGB(48, 158, 255, 5);
